@@ -1,12 +1,12 @@
-[Previous test content]
+[Previous test content remains...]
 
 Clarinet.test({
-    name: "Can update service heartbeat",
+    name: "Enforces heartbeat rate limiting",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         const deployer = accounts.get('deployer')!;
         const serviceName = "test-service";
         
-        // Register service first
+        // Register service
         let register = chain.mineBlock([
             Tx.contractCall(
                 'tetralink',
@@ -23,8 +23,8 @@ Clarinet.test({
 
         const serviceId = register.receipts[0].result.expectOk();
 
-        // Update heartbeat
-        let heartbeat = chain.mineBlock([
+        // First heartbeat should succeed
+        let heartbeat1 = chain.mineBlock([
             Tx.contractCall(
                 'tetralink',
                 'heartbeat',
@@ -32,9 +32,19 @@ Clarinet.test({
                 deployer.address
             )
         ]);
+        heartbeat1.receipts[0].result.expectOk().expectBool(true);
 
-        heartbeat.receipts[0].result.expectOk().expectBool(true);
+        // Immediate second heartbeat should fail
+        let heartbeat2 = chain.mineBlock([
+            Tx.contractCall(
+                'tetralink',
+                'heartbeat',
+                [serviceId],
+                deployer.address
+            )
+        ]);
+        heartbeat2.receipts[0].result.expectErr(429);
     }
 });
 
-[Additional test cases for new functions]
+[Additional test cases...]
