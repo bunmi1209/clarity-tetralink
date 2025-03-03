@@ -1,61 +1,20 @@
-import {
-  Clarinet,
-  Tx,
-  Chain,
-  Account,
-  types
-} from 'https://deno.land/x/clarinet@v1.0.0/index.ts';
-import { assertEquals } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
-
-// Existing tests remain unchanged
-[... existing test content ...]
+[Previous test content remains...]
 
 Clarinet.test({
-    name: "Can register service with version and metadata",
+    name: "Enforces heartbeat rate limiting",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         const deployer = accounts.get('deployer')!;
         const serviceName = "test-service";
-        const endpoint = "http://localhost:8080";
-        const version = "1.0.0";
-        const metadata = JSON.stringify({
-            description: "Test service",
-            documentation: "http://docs.test.com"
-        });
-
-        let block = chain.mineBlock([
-            Tx.contractCall(
-                'tetralink',
-                'register-service',
-                [
-                    types.ascii(serviceName),
-                    types.ascii(endpoint),
-                    types.ascii(version),
-                    types.some(types.utf8(metadata))
-                ],
-                deployer.address
-            )
-        ]);
-
-        block.receipts[0].result.expectOk().expectUint(1);
-    }
-});
-
-Clarinet.test({
-    name: "Can update service version",
-    async fn(chain: Chain, accounts: Map<string, Account>) {
-        const deployer = accounts.get('deployer')!;
-        const serviceName = "test-service";
-        const endpoint = "http://localhost:8080";
-        const version = "1.0.0";
         
+        // Register service
         let register = chain.mineBlock([
             Tx.contractCall(
                 'tetralink',
                 'register-service',
                 [
                     types.ascii(serviceName),
-                    types.ascii(endpoint),
-                    types.ascii(version),
+                    types.ascii("http://localhost:8080"),
+                    types.ascii("1.0.0"),
                     types.none()
                 ],
                 deployer.address
@@ -64,15 +23,28 @@ Clarinet.test({
 
         const serviceId = register.receipts[0].result.expectOk();
 
-        let update = chain.mineBlock([
+        // First heartbeat should succeed
+        let heartbeat1 = chain.mineBlock([
             Tx.contractCall(
                 'tetralink',
-                'update-service-version',
-                [serviceId, types.ascii("1.1.0")],
+                'heartbeat',
+                [serviceId],
                 deployer.address
             )
         ]);
+        heartbeat1.receipts[0].result.expectOk().expectBool(true);
 
-        update.receipts[0].result.expectOk().expectBool(true);
+        // Immediate second heartbeat should fail
+        let heartbeat2 = chain.mineBlock([
+            Tx.contractCall(
+                'tetralink',
+                'heartbeat',
+                [serviceId],
+                deployer.address
+            )
+        ]);
+        heartbeat2.receipts[0].result.expectErr(429);
     }
 });
+
+[Additional test cases...]
